@@ -68,8 +68,12 @@ def toggle_command():
 
     return redirect(url_for('home'))
 
-# Регистрация пользователя через Telegram
+# Обработчик команды регистрации пользователя
 async def handle_registration(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not command_states["register"]:
+        await notify_command_disabled(update, "/register")
+        return
+
     user = update.effective_user
     telegram_id = user.id
     username = user.username
@@ -89,7 +93,12 @@ async def handle_registration(update: Update, context: ContextTypes.DEFAULT_TYPE
             (telegram_id, username)
         )
         conn.commit()
-        bot_reply = "Вы успешно зарегистрированы!" if cursor.rowcount > 0 else "Вы уже зарегистрированы!"
+
+        # Проверяем, была ли вставка в таблицу
+        if cursor.rowcount > 0:
+            bot_reply = "Вы успешно зарегистрированы!"
+        else:
+            bot_reply = "Вы уже зарегистрированы!"
     except Error as e:
         bot_reply = f"Ошибка регистрации: {e}"
     finally:
@@ -248,37 +257,6 @@ async def stop_timer(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(bot_reply)
     log_conversation(update.effective_user.id, update.effective_user.username, "/stop_timer", bot_reply)
-
-# Обработчик команды регистрации пользователя
-async def handle_registration(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not command_states["register"]:
-        await notify_command_disabled(update, "/register")
-        return
-
-    user = update.effective_user
-    telegram_id = user.id
-    username = user.username
-
-    conn = get_db_connection()
-    if conn is None:
-        bot_reply = "Ошибка подключения к базе данных."
-        await update.message.reply_text(bot_reply)
-        return
-
-    try:
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO lr1db (telegram_id, username) VALUES (%s, %s)",
-            (telegram_id, username)
-        )
-        conn.commit()
-        bot_reply = "Вы успешно зарегистрированы!"
-    except Error as e:
-        bot_reply = f"Ошибка регистрации: {e}"
-    finally:
-        conn.close()
-
-    await update.message.reply_text(bot_reply)
 
 # Обработка текстовых файлов
 async def handle_text_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
